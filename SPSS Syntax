@@ -1,5 +1,14 @@
 
-DATASET ACTIVATE DataSetOriginal.
+#Welcome to my Desk Project SPPS Syntax,
+
+#The following code is the final version of my SPSS syntax, containing the entirety of my data analysis. 
+#Please Enjoy.
+
+
+
+* Encoding: UTF-8.
+
+DATASET ACTIVATE DataSet1.
 
 # Codebook to look at the data
 
@@ -12,7 +21,7 @@ CODEBOOK  cohort_AD_control [n]
 
 # Recoding into binary variables (Transform -> Recode into different variables)
 
-DATASET ACTIVATE DataSetOriginal.
+DATASET ACTIVATE DataSet1
 
 RECODE SEX ('F'=1) ('M'=0) INTO sex_rec.
 VARIABLE LABELS  sex_rec 'sex_rec'.
@@ -43,6 +52,16 @@ INTO latelife_bp_rec.
 VARIABLE LABELS  latelife_bp_rec 'Late-life bp measurements available'.
 EXECUTE.
 
+RECODE braak_group ('0-II'=0) ('III-IV'=1) ('V-VI'=2) 
+INTO braak_group_rec.
+VARIABLE LABELS  braak_group_rec 'Braak stage group (0-II, III-IV, V-VI)'.
+EXECUTE.
+
+RECODE Infarcts_any ('1'=1) ('.'=0) 
+INTO Infarcts_any_rec.
+VARIABLE LABELS  Infarcts_any_rec 'Infarcts of any size'.
+EXECUTE.
+
 DATASET ACTIVATE DataSet4.
 RECODE AHT_anyreason ('No'=0) ('Yes'=1) INTO AHT_anyreason_rec.
 VARIABLE LABELS  AHT_anyreason_rec 'antihypertensives - any type for any reason'.
@@ -53,7 +72,7 @@ VARIABLE LABELS  AHT_reason_rec 'antihypertensives - reason if for/not for treat
 EXECUTE.
 
 RECODE SVD_frontal SVD_parietal CAA_frontal CAA_parietal (0=0) (1=0) (2=1) (3=1) INTO 
-    SVD_frontal_rec2 SVD_parietal_rec2 CAA_frontal_rec2 CAA_parietal_rec2.
+    SVD_frontal_rec SVD_parietal_rec CAA_frontal_rec CAA_parietal_rec.
 EXECUTE.
 
 #########################################################################################
@@ -171,6 +190,18 @@ FREQUENCIES VARIABLES=AGE PMDELAY
 
 #########################################################################################
 
+#Overlap between hypertensive ever in life and mid-life hypertensive
+
+CROSSTABS
+  /TABLES= htn_rec BY htn_midlife_rec
+  /FORMAT=AVALUE TABLES
+  /STATISTICS=CHISQ 
+   /CELLS=COUNT ROW PROP 
+  /COUNT ROUND CELL
+  /BARCHART.
+
+#########################################################################################
+
 #Are there sig- differences between age, sex or PMDELAY
 
 DATASET ACTIVATE DataSetOriginal.
@@ -243,4 +274,619 @@ CROSSTABS
   /CELLS=COUNT ROW PROP 
   /COUNT ROUND CELL
   /BARCHART.
+
+
+GRAPH
+  /BAR(GROUPED)=PCT BY cohort_AD_control BY htn_diag_rec.
+
+#########################################################################################
+#########################################################################################
+
+#TASK 2: Is there an association between midlife or late-life SBP/DBP and AD?
+
+#########################################################################################
+#########################################################################################
+
+#Tests of association:
+
+#Is there an overall association between HT and AD?
+
+#Assessing the relationship between two categorical variables = Chi squared test
+
+DATASET ACTIVATE DataSetOriginal.
+
+CROSSTABS
+  /TABLES=cohort_AD_control BY htn_rec
+  /FORMAT=AVALUE TABLES
+  /STATISTICS=CHISQ PHI 
+  /CELLS=COUNT ROW COLUMN TOTAL 
+  /COUNT ROUND CELL.
+
+#X(1) = 0.000, p=0.986
+#No statistically significant association between HT and AD 
+
+#2.1.2. Is there a sig association between overall mid-life HT and AD?
+
+CROSSTABS
+  /TABLES=cohort_AD_control BY htn_midlife_rec
+  /FORMAT=AVALUE TABLES
+  /STATISTICS=CHISQ PHI 
+  /CELLS=COUNT ROW COLUMN TOTAL 
+  /COUNT ROUND CELL.
+
+#X(1) = 2.088, p=0.148
+#No statistically significant association between mid-life HT and AD.
+
+#########################################################################################
+
+#Single comparison tests
+
+#Is there a significant difference between mean mid-life SBP and mean mid-life DBP in AD vs Controls?
+
+DATASET ACTIVATE DataSetOriginal.
+# Originial, non-split
+
+# Comparing the means of two independent groups (AD vs Control) = t test (using non-split data) or non-paramentric alternative
+# Assumptions: Normality 
+# Shapiro-Wilk test as our numerical means of assessing normality (or hist or qqplot)
+#Data normally distributed if Shapiro test not sig.
+#Assumption of homogeneity of variance: levenes test must be non-significant
+
+EXAMINE VARIABLES=SBP_midlife_mean SBP_65plus DBP_midlife_mean DBP_65plus
+  /PLOT BOXPLOT STEMLEAF NPPLOT
+  /COMPARE GROUPS
+  /STATISTICS DESCRIPTIVES
+  /CINTERVAL 95
+  /MISSING LISTWISE
+  /NOTOTAL.
+
+# Mid-life SBP/DBP and late-life SBP normally distributed -> Independent samples t test
+#Late-life DBP not normally distributed -> Mann-Whitney test 
+
+T-TEST GROUPS=cohort_AD_control(0 1)
+  /MISSING=ANALYSIS
+  /VARIABLES=SBP_midlife_mean DBP_midlife_mean SBP_65plus DBP_65plus
+  /CRITERIA=CI(.95).
+
+NPAR TESTS
+  /M-W= DBP_65plus BY cohort_AD_control(0 1)
+  /STATISTICS=DESCRIPTIVES QUARTILES
+  /MISSING ANALYSIS.
+
+#Individuals with AD have sig. higher late-life DBP compared to controls (p<0.05). 
+
+#Is there a association between mean mid-life SBP and mean mid-life DBP in AD vs Controls?
+
+#A binomial logistic regression, predicts the probability that an observation falls into one of 
+#two categories of a dichotomous dependent variable based on one or more independent variables that can be 
+#either continuous or categorical.
+#i.e. cohort_AD_control is the dependent variable
+
+LOGISTIC REGRESSION VARIABLES cohort_AD_control
+  /METHOD=ENTER SBP_midlife_mean
+  /CLASSPLOT
+  /CASEWISE OUTLIER(2)
+  /PRINT=GOODFIT SUMMARY
+  /CRITERIA=PIN(0.05) POUT(0.10) ITERATE(20) CUT(0.5).
+
+LOGISTIC REGRESSION VARIABLES cohort_AD_control
+  /METHOD=ENTER DBP_midlife_mean
+  /CLASSPLOT
+  /CASEWISE OUTLIER(2)
+  /PRINT=GOODFIT SUMMARY
+  /CRITERIA=PIN(0.05) POUT(0.10) ITERATE(20) CUT(0.5).
+
+LOGISTIC REGRESSION VARIABLES cohort_AD_control
+  /METHOD=ENTER SBP_65plus
+  /CLASSPLOT
+  /CASEWISE OUTLIER(2)
+  /PRINT=GOODFIT SUMMARY
+  /CRITERIA=PIN(0.05) POUT(0.10) ITERATE(20) CUT(0.5).
+
+LOGISTIC REGRESSION VARIABLES cohort_AD_control
+  /METHOD=ENTER DBP_65plus 
+  /CLASSPLOT
+  /CASEWISE OUTLIER(2)
+  /PRINT=GOODFIT SUMMARY
+  /CRITERIA=PIN(0.05) POUT(0.10) ITERATE(20) CUT(0.5).
+
+
+#########################################################################################
+#########################################################################################
+
+#TASK 3: Relationship between AD and AHM
+
+#########################################################################################
+#########################################################################################
+
+#Association between AD and AHT
+
+DATASET ACTIVATE DataSetOriginal.
+
+CROSSTABS
+  /TABLES=AHT_anyreason_rec BY cohort_AD_control
+  /FORMAT=AVALUE TABLES
+  /STATISTICS=CHISQ 
+  /CELLS=COUNT ROW ASRESID 
+  /COUNT ROUND CELL
+  /BARCHART.
+
+#Χ2(1)= 44.014, p = 0.000.
+#Significant association was found between AD and AHT_anyreason.
+#Of cases not treated with any AHM, 78.08 % had AD.
+#Of cases  treated with any AHM, 29.37 % had AD.
+
+LOGISTIC REGRESSION VARIABLES AHT_anyreason_rec
+  /METHOD=ENTER cohort_AD_control 
+  /CONTRAST (cohort_AD_control)=Indicator(1)
+  /CLASSPLOT
+  /PRINT=CORR CI(95)
+  /CRITERIA=PIN(0.05) POUT(0.10) ITERATE(20) CUT(0.5).
+
+DATASET ACTIVATE DataSetHT.
+
+LOGISTIC REGRESSION VARIABLES AHT_anyreason_rec
+  /METHOD=ENTER cohort_AD_control 
+  /CONTRAST (cohort_AD_control)=Indicator(1)
+  /CLASSPLOT
+  /PRINT=CORR CI(95)
+  /CRITERIA=PIN(0.05) POUT(0.10) ITERATE(20) CUT(0.5).
+
+#########################################################################################
+
+#Is HT more likely to be treated in Control than AD?
+
+DATASET ACTIVATE DataSetHT.
+#Split by htn_rec only
+
+SORT CASES  BY htn_rec.
+SPLIT FILE LAYERED BY htn_rec.
+
+CROSSTABS
+  /TABLES= cohort_AD_control BY AHT_anyreason_rec
+  /FORMAT=AVALUE TABLES
+    /STATISTICS=CHISQ 
+  /CELLS=COUNT ROW PROP 
+  /COUNT ROUND CELL
+  /BARCHART.
+
+#Within HT cases, significant association between AHM and AD (X2(1) = 36.051, p = 0.000).
+#Of the AD cases with HT, 42.11 % receive AHT.
+#Of the Control cases with HT, 87.06 % receive AHT.
+
+DATASET ACTIVATE DataSetHTDiag.
+#Split by htn_rec only
+
+SORT CASES  BY htn_diag_rec.
+SPLIT FILE LAYERED BY htn_diag_rec.
+
+CROSSTABS
+  /TABLES= cohort_AD_control BY AHT_anyreason_rec
+  /FORMAT=AVALUE TABLES
+    /STATISTICS=CHISQ 
+  /CELLS=COUNT ROW PROP 
+  /COUNT ROUND CELL
+  /BARCHART.
+
+#########################################################################################
+
+#To assess if the contribution of elevated late-life DBP to the likelihood of AD is independent of AHT
+
+LOGISTIC REGRESSION VARIABLES cohort_AD_control
+  /METHOD=ENTER AHT_anyreason_rec DBP_65plus 
+  /CONTRAST (AHT_anyreason_rec)=Indicator(1)
+  /CLASSPLOT
+  /PRINT=CORR CI(95)
+  /CRITERIA=PIN(0.05) POUT(0.10) ITERATE(20) CUT(0.5).
+
+#########################################################################################
+
+#Relationship between different AHT and BP
+
+DATASET ACTIVATE DataSetOriginal.
+# Originial, non-split
+
+# Comparing the means of two independent groups (AD vs Control) = t test (using non-split data) or non-paramentric alternative
+# Assumptions: Normality 
+# Shapiro-Wilk test as our numerical means of assessing normality (or hist or qqplot)
+#Data normally distributed if Shapiro test not sig.
+#Assumption of homogeneity of variance: levenes test must be non-significant
+
+#Comparing mean BP between any AHM and no AHM
+
+EXAMINE VARIABLES=SBP_midlife_mean SBP_65plus DBP_midlife_mean DBP_65plus
+  /PLOT BOXPLOT STEMLEAF NPPLOT
+  /COMPARE GROUPS
+  /STATISTICS DESCRIPTIVES
+  /CINTERVAL 95
+  /MISSING LISTWISE
+  /NOTOTAL.
+
+# Mid-life SBP/DBP and late-life SBP normally distributed -> Independent samples t test
+#Late-life DBP not normally distributed -> Mann-Whitney test 
+
+#Assumption for Mann-Whitney U test: equal shape distributions of the dependent variable
+#test of homogeneity of variance (same for kruskal wallis) as follows:
+
+EXAMINE VARIABLES=DBP_65plus BY AHT_anyreason_rec
+  /PLOT BOXPLOT STEMLEAF SPREADLEVEL(1)
+  /COMPARE GROUPS
+  /STATISTICS DESCRIPTIVES
+  /CINTERVAL 95
+  /MISSING LISTWISE
+  /NOTOTAL.
+
+#Based on Median and with adjusted df: not sig. 
+#Thus assumption met (equal distribution) and are able to use Mann U test
+
+T-TEST GROUPS=AHT_anyreason_rec(0 1)
+  /MISSING=ANALYSIS
+/VARIABLES=SBP_midlife_mean DBP_midlife_mean SBP_65plus 
+  /CRITERIA=CI(.95). 
+NPAR TESTS
+  /M-W= DBP_65plus BY AHT_anyreason_rec(0 1)
+  /STATISTICS=DESCRIPTIVES QUARTILES
+  /MISSING ANALYSIS.
+
+
+#########################################################################################
+
+#Same thing but within the AD cohort: Is AHT successful in lowering BP?
+
+# Mid-life SBP/DBP and late-life SBP normally distributed -> Independent samples t test
+#Late-life DBP not normally distributed -> Mann-Whitney test 
+
+# Comparing mean BP between any AHM and no AHM within the AD cohort
+
+DATASET ACTIVATE DataSetAD.
+
+SORT CASES  BY cohort_AD_control.
+SPLIT FILE LAYERED BY cohort_AD_control.
+
+T-TEST GROUPS=AHT_anyreason_rec(0 1)
+  /MISSING=ANALYSIS
+/VARIABLES=SBP_midlife_mean DBP_midlife_mean SBP_65plus DBP_65plus
+  /CRITERIA=CI(.95). 
+
+#not significant
+
+NPAR TESTS
+  /M-W= DBP_65plus BY AHT_anyreason_rec(0 1)
+  /STATISTICS=DESCRIPTIVES QUARTILES
+  /MISSING ANALYSIS.
+
+#########################################################################################
+
+#Were AD cases more likely to have received less effective AHT?
+
+#Were the AD group more likely to have donated their brain in an earlier time when HT was less likely to be treated appropriately? 
+
+DATASET ACTIVATE DataSetAD.
+#Split by AD only
+
+DESCRIPTIVES VARIABLES=year_death
+  /STATISTICS=MEAN STDDEV MIN MAX.
+
+#AD: year of death mean = 2001.64 ± 8.28
+#Control: year of death mean = 2006.85 ± 11.41
+
+DATASET ACTIVATE DataSet1.
+#Original, non-split
+
+NPAR TESTS
+  /M-W= year_death BY cohort_AD_control(0 1)
+  /STATISTICS=DESCRIPTIVES QUARTILES
+  /MISSING ANALYSIS.
+
+#U = 3242, p = 0.000
+#Control group sig. later year if death than AD group
+
+
+
+#########################################################################################
+#########################################################################################
+
+#TASK 4: What is the relationship between HT and markers of disease severity?
+
+#########################################################################################
+#########################################################################################
+
+# Comparing the means of two independent groups (HT vs Norm) = t test (using non-split data)
+# Assumptions: Normality and Homogeneity of variance: levenes test must be non-significant
+# Shapiro-Wilk test as our numerical means of assessing normality (or hist or qqplot)
+#Data normal if shapiro non sig.
+
+DATASET ACTIVATE DataSetAD.
+
+EXAMINE VARIABLES=AB42insol_fcx AB40insol_fcx ab_4G8_f AT8_F AB42insol_pccx AB40insol_pccx 
+ab_4G8_p AT8_P AB42insol_fwm AB42insol_pcwm
+  /PLOT BOXPLOT STEMLEAF NPPLOT
+  /COMPARE GROUPS
+  /STATISTICS DESCRIPTIVES
+  /CINTERVAL 95
+  /MISSING LISTWISE
+  /NOTOTAL.
+
+#Normal: ab_4G8_f AT8_F AB42insol_pccx ab_4G8_p AT8_P
+
+NPAR TESTS
+  /M-W= AB42insol_fcx AB40insol_fcx AB40insol_pccx AB42insol_fwm AB42insol_pcwm BY htn_rec(0 1)
+  /STATISTICS=DESCRIPTIVES QUARTILES
+  /MISSING ANALYSIS.
+T-TEST GROUPS=htn_rec(0 1)
+  /MISSING=ANALYSIS
+/VARIABLES= ab_4G8_f AT8_F AB42insol_pccx ab_4G8_p AT8_P
+  /CRITERIA=CI(.95). 
+
+#for table (means and SEM)
+
+T-TEST GROUPS=htn_rec(0 1)
+  /MISSING=ANALYSIS
+/VARIABLES= AB42insol_fcx AB40insol_fcx ab_4G8_f AT8_F AB42insol_pccx AB40insol_pccx 
+ab_4G8_p AT8_P AB42insol_fwm AB42insol_pcwm
+  /CRITERIA=CI(.95). 
+
+
+#########################################################################################
+
+#Repeat all but with hypertension in mid-life instead of hypertension ever in life
+
+NPAR TESTS
+  /M-W= AB42insol_fcx AB40insol_fcx AB40insol_pccx AB42insol_fwm AB42insol_pcwm 
+  BY htn_midlife_rec(0 1)
+  /STATISTICS=DESCRIPTIVES QUARTILES
+  /MISSING ANALYSIS.
+T-TEST GROUPS=htn_midlife_rec(0 1)
+  /MISSING=ANALYSIS
+/VARIABLES= ab_4G8_f AT8_F AB42insol_pccx ab_4G8_p AT8_P
+  /CRITERIA=CI(.95). 
+
+#For table
+
+T-TEST GROUPS=htn_midlife_rec(0 1)
+  /MISSING=ANALYSIS
+/VARIABLES= AB42insol_fcx AB40insol_fcx ab_4G8_f AT8_F AB42insol_pccx AB40insol_pccx 
+ab_4G8_p AT8_P AB42insol_fwm AB42insol_pcwm
+  /CRITERIA=CI(.95). 
+
+#########################################################################################
+
+#Two-way ANOVA
+
+#Examine normality of residuals
+
+UNIANOVA AB42insol_fcx AB40insol_fcx ab_4G8_f AT8_F AB42insol_pccx AB40insol_pccx 
+ab_4G8_p AT8_P AB42insol_fwm AB42insol_pcwm
+  /METHOD=SSTYPE(3)
+  /INTERCEPT=INCLUDE
+  /SAVE=RESID
+  /CRITERIA=ALPHA(0.05).
+
+EXAMINE VARIABLES=RES_1 RES_2 RES_3 RES_4 RES_5 RES_6 RES_7 RES_8 RES_9 RES_10
+  /PLOT BOXPLOT STEMLEAF NPPLOT
+  /COMPARE GROUPS
+  /STATISTICS DESCRIPTIVES
+  /CINTERVAL 95
+  /MISSING LISTWISE
+  /NOTOTAL.
+
+#All sig. i.e. not normally distributed
+
+UNIANOVA AB42insol_fcx AB40insol_fcx ab_4G8_f AT8_F AB42insol_pccx AB40insol_pccx 
+ab_4G8_p AT8_P AB42insol_fwm AB42insol_pcwm BY cohort_AD_control htn_midlife_rec
+  /METHOD=SSTYPE(3)
+  /INTERCEPT=INCLUDE
+  /PLOT=PROFILE(htn_midlife_rec*cohort_AD_control) TYPE=LINE ERRORBAR=NO MEANREFERENCE=NO YAXIS=AUTO    
+  /PRINT DESCRIPTIVE
+  /CRITERIA=ALPHA(.05)
+  /DESIGN=cohort_AD_control htn_midlife_rec cohort_AD_control*htn_midlife_rec.
+
+UNIANOVA AB42insol_fcx AB40insol_fcx ab_4G8_f AT8_F AB42insol_pccx AB40insol_pccx 
+ab_4G8_p AT8_P AB42insol_fwm AB42insol_pcwm BY cohort_AD_control htn_rec
+  /METHOD=SSTYPE(3)
+  /INTERCEPT=INCLUDE
+  /PLOT=PROFILE(htn_rec*cohort_AD_control) TYPE=LINE ERRORBAR=NO MEANREFERENCE=NO YAXIS=AUTO    
+  /PRINT DESCRIPTIVE
+  /CRITERIA=ALPHA(.05)
+  /DESIGN=cohort_AD_control htn_rec cohort_AD_control*htn_rec.
+
+#########################################################################################
+#########################################################################################
+
+#TASK 5: Is there a relationship between hypertension and a reduction in blood flow in the cerebral cortex and white matter?
+
+#########################################################################################
+#########################################################################################
+
+#Hypertension ever in life compared to normotensive
+
+# Comparing the means of two independent groups (HT vs Norm) = t test (using non-split data)
+# Assumptions: Normality and Homogeneity of variance: levenes test must be non-significant
+#Check for normal distribution
+
+EXAMINE VARIABLES=VEGF_fcx2 VEGF_fwm2 VEGF_pccx2 VEGF_pcwm2 FGA_Hb_fcx FGA_Hb_fwm FGA_Hb_pcx 
+  FGA_Hb_pwm PDGFRB_pccx2 PDGFRB_fcx2
+  /PLOT BOXPLOT STEMLEAF NPPLOT
+  /COMPARE GROUPS
+  /STATISTICS DESCRIPTIVES
+  /CINTERVAL 95
+  /MISSING LISTWISE
+  /NOTOTAL.
+
+#All significant i.e. no normal distribution -> non-parametric test
+
+#HT ever in life 
+
+NPAR TESTS
+  /M-W= VEGF_fcx2 VEGF_fwm2 VEGF_pccx2 VEGF_pcwm2 FGA_Hb_fcx FGA_Hb_fwm FGA_Hb_pcx 
+  FGA_Hb_pwm PDGFRB_pccx2 PDGFRB_fcx2 BY htn_rec(0 1)
+  /STATISTICS=DESCRIPTIVES QUARTILES
+  /MISSING ANALYSIS.
+
+#PDGFRB_pccx2 PDGFRB_fcx2 non-sig. i.e. normal distribution
+
+#Mid-life HT
+
+NPAR TESTS
+  /M-W= VEGF_fcx2 VEGF_fwm2 VEGF_pccx2 VEGF_pcwm2 FGA_Hb_fcx FGA_Hb_fwm FGA_Hb_pcx 
+  FGA_Hb_pwm PDGFRB_pccx2 PDGFRB_fcx2 BY htn_midlife_rec(0 1)
+  /STATISTICS=DESCRIPTIVES QUARTILES
+  /MISSING ANALYSIS.
+
+#All non-sig.
+
+
+#########################################################################################
+#########################################################################################
+
+#Relationship between CAA and SVD and (mid-life HT).
+
+DATASET ACTIVATE DataSetOriginal.
+
+CROSSTABS
+  /TABLES=htn_rec htn_midlife_rec BY SVD_frontal_rec SVD_parietal_rec CAA_frontal_rec 
+    CAA_parietal_rec
+  /FORMAT=AVALUE TABLES
+  /STATISTICS=CHISQ 
+  /CELLS=COUNT ROW ASRESID 
+  /COUNT ROUND CELL.
+#Binary variable
+
+#CROSSTABS
+  /TABLES=htn_rec htn_midlife_rec BY SVD_frontal SVD_parietal CAA_frontal CAA_parietal
+  /FORMAT=AVALUE TABLES
+  /STATISTICS=CHISQ 
+  /CELLS=COUNT ROW ASRESID 
+  /COUNT ROUND CELL.
+#Scores
+
+LOGISTIC REGRESSION VARIABLES SVD_frontal_rec
+  /METHOD=ENTER  htn_rec
+  /CONTRAST (SVD_frontal_rec)=Indicator(1)
+  /CLASSPLOT
+  /PRINT=CORR CI(95)
+  /CRITERIA=PIN(0.05) POUT(0.10) ITERATE(20) CUT(0.5).
+
+LOGISTIC REGRESSION VARIABLES SVD_parietal_rec
+  /METHOD=ENTER htn_midlife_rec
+  /CONTRAST (SVD_frontal_rec)=Indicator(1)
+  /CLASSPLOT
+  /PRINT=CORR CI(95)
+  /CRITERIA=PIN(0.05) POUT(0.10) ITERATE(20) CUT(0.5).
+
+#Out of curiosity:
+CROSSTABS
+  /TABLES=cohort_AD_control BY SVD_frontal_rec SVD_parietal_rec CAA_frontal_rec 
+    CAA_parietal_rec
+  /FORMAT=AVALUE TABLES
+  /STATISTICS=CHISQ 
+  /CELLS=COUNT ROW ASRESID 
+  /COUNT ROUND CELL.
+
+##############################################################################
+
+#BP measurments and SVD/CAA
+#Binary variable and thus independent samples t test
+
+EXAMINE VARIABLES=SBP_midlife_mean SBP_65plus DBP_midlife_mean DBP_65plus
+  /PLOT BOXPLOT NPPLOT
+  /COMPARE GROUPS
+  /STATISTICS DESCRIPTIVES
+  /CINTERVAL 95
+  /MISSING LISTWISE
+  /NOTOTAL.
+
+# Mid-life SBP/DBP and late-life DBP normally distributed -> Independent samples t test
+#Late-life SBP not normally distributed -> Mann-Whitney test 
+
+#SVD
+
+T-TEST GROUPS=SVD_frontal_rec(0 1)
+  /MISSING=ANALYSIS
+  /VARIABLES=SBP_midlife_mean DBP_midlife_mean DBP_65plus
+  /CRITERIA=CI(.95).
+NPAR TESTS
+  /M-W= SBP_65plus BY SVD_frontal_rec(0 1)
+  /STATISTICS=DESCRIPTIVES QUARTILES
+  /MISSING ANALYSIS.
+
+T-TEST GROUPS=SVD_parietal_rec(0 1)
+  /MISSING=ANALYSIS
+  /VARIABLES=SBP_midlife_mean DBP_midlife_mean DBP_65plus
+  /CRITERIA=CI(.95).
+NPAR TESTS
+  /M-W= SBP_65plus BY SVD_parietal_rec(0 1)
+  /STATISTICS=DESCRIPTIVES QUARTILES
+  /MISSING ANALYSIS.
+
+#CAA
+
+T-TEST GROUPS=CAA_frontal_rec(0 1)
+  /MISSING=ANALYSIS
+  /VARIABLES=SBP_midlife_mean DBP_midlife_mean DBP_65plus
+  /CRITERIA=CI(.95).
+NPAR TESTS
+  /M-W= SBP_65plus BY CAA_frontal_rec(0 1)
+  /STATISTICS=DESCRIPTIVES QUARTILES
+  /MISSING ANALYSIS.
+
+T-TEST GROUPS=CAA_parietal_rec(0 1)
+  /MISSING=ANALYSIS
+  /VARIABLES=SBP_midlife_mean DBP_midlife_mean DBP_65plus
+  /CRITERIA=CI(.95).
+NPAR TESTS
+  /M-W= SBP_65plus BY CAA_parietal_rec(0 1)
+  /STATISTICS=DESCRIPTIVES QUARTILES
+  /MISSING ANALYSIS.
+
+#Spearmans rank
+
+NONPAR CORR
+  /VARIABLES=SVD_frontal SBP_midlife_mean DBP_midlife_mean DBP_65plus
+  /PRINT=SPEARMAN TWOTAIL NOSIG
+  /MISSING=PAIRWISE.
+
+NONPAR CORR
+  /VARIABLES=SVD_parietal SBP_midlife_mean DBP_midlife_mean DBP_65plus
+  /PRINT=SPEARMAN TWOTAIL NOSIG
+  /MISSING=PAIRWISE.
+
+NONPAR CORR
+  /VARIABLES=CAA_frontal SBP_midlife_mean DBP_midlife_mean DBP_65plus
+  /PRINT=SPEARMAN TWOTAIL NOSIG
+  /MISSING=PAIRWISE.
+
+NONPAR CORR
+  /VARIABLES=CAA_parietal SBP_midlife_mean DBP_midlife_mean DBP_65plus
+  /PRINT=SPEARMAN TWOTAIL NOSIG
+  /MISSING=PAIRWISE.
+
+
+#########################################################################################
+#########################################################################################
+
+#For retrospective power analysis
+
+#########################################################################################
+#########################################################################################
+
+DATASET ACTIVATE DataSetAD.
+
+NPAR TESTS
+  /M-W= ab_4G8_f BY htn_rec(0 1)
+  /STATISTICS=DESCRIPTIVES QUARTILES
+  /MISSING ANALYSIS.
+
+#for table 
+
+T-TEST GROUPS=htn_rec(0 1)
+  /MISSING=ANALYSIS
+/VARIABLES= ab_4G8_f 
+  /CRITERIA=CI(.95). 
+
+
+
+#Thank you for reading. 
+#Best,
+#Amina
 
