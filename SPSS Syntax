@@ -5,9 +5,6 @@
 #Please enjoy.
 
 
-
-* Encoding: UTF-8.
-
 DATASET ACTIVATE DataSet1.
 
 # Codebook to look at the data
@@ -200,6 +197,7 @@ CROSSTABS
   /COUNT ROUND CELL
   /BARCHART.
 
+
 #########################################################################################
 
 #Are there sig- differences between age, sex or PMDELAY
@@ -216,17 +214,85 @@ EXAMINE VARIABLES=AGE PMDELAY sex_rec
   
 #sig. i.e. no normal distribrution = non-parametric test
 
+DATASET ACTIVATE DataSetHT.
+SORT CASES  BY htn_rec .
+SPLIT FILE LAYERED BY htn_rec .
+
 NPAR TESTS
-  /M-W= AGE PMDELAY sex_rec BY htn_rec (0 1)
+  /M-W= AGE PMDELAY sex_rec BY cohort_AD_control (0 1)
   /STATISTICS=DESCRIPTIVES QUARTILES
   /MISSING ANALYSIS.
 
 NPAR TESTS
-  /M-W= AGE PMDELAY sex_rec BY htn_midlife_rec (0 1)
+  /M-W= AGE PMDELAY sex_rec BY AHT_anyreason_rec (0 1)
   /STATISTICS=DESCRIPTIVES QUARTILES
   /MISSING ANALYSIS.
 
-#No sig. differences between HT and norm (ever in life or midlife)
+
+DATASET ACTIVATE DataSetMidHT.
+SORT CASES  BY htn_midlife_rec .
+SPLIT FILE LAYERED BY htn_midlife_rec .
+
+NPAR TESTS
+  /M-W= AGE PMDELAY sex_rec BY cohort_AD_control (0 1)
+  /STATISTICS=DESCRIPTIVES QUARTILES
+  /MISSING ANALYSIS.
+
+NPAR TESTS
+  /M-W= AGE PMDELAY sex_rec BY AHT_anyreason_rec (0 1)
+  /STATISTICS=DESCRIPTIVES QUARTILES
+  /MISSING ANALYSIS.
+
+
+#For the table
+
+DATASET ACTIVATE DataSetHTAD.
+
+SORT CASES  BY htn_rec cohort_AD_control.
+SPLIT FILE LAYERED BY htn_rec cohort_AD_control.
+
+EXAMINE VARIABLES=AGE PMDELAY sex_rec
+  /PLOT NONE
+  /STATISTICS DESCRIPTIVES
+  /CINTERVAL 95
+  /MISSING LISTWISE
+  /NOTOTAL.
+
+DATASET ACTIVATE DataSetHTAHT.
+
+SORT CASES  BY htn_rec AHT_anyreason_rec.
+SPLIT FILE LAYERED BY htn_rec AHT_anyreason_rec.
+
+EXAMINE VARIABLES=AGE PMDELAY 
+  /PLOT NONE
+  /STATISTICS DESCRIPTIVES
+  /CINTERVAL 95
+  /MISSING LISTWISE
+  /NOTOTAL.
+
+DATASET ACTIVATE DataSetMidHTAD.
+
+SORT CASES  BY htn_midlife_rec cohort_AD_control.
+SPLIT FILE LAYERED BY htn_midlife_rec cohort_AD_control.
+
+EXAMINE VARIABLES=AGE PMDELAY
+  /PLOT NONE
+  /STATISTICS DESCRIPTIVES
+  /CINTERVAL 95
+  /MISSING LISTWISE
+  /NOTOTAL.
+
+DATASET ACTIVATE DataSetMidHTAHT.
+
+SORT CASES  BY htn_midlife_rec AHT_anyreason_rec.
+SPLIT FILE LAYERED BY htn_midlife_rec AHT_anyreason_rec.
+
+EXAMINE VARIABLES=AGE PMDELAY 
+  /PLOT NONE
+  /STATISTICS DESCRIPTIVES
+  /CINTERVAL 95
+  /MISSING LISTWISE
+  /NOTOTAL.
 
 #########################################################################################
 
@@ -274,10 +340,7 @@ CROSSTABS
   /CELLS=COUNT ROW PROP 
   /COUNT ROUND CELL
   /BARCHART.
-
-
-GRAPH
-  /BAR(GROUPED)=PCT BY cohort_AD_control BY htn_diag_rec.
+  
 
 #########################################################################################
 #########################################################################################
@@ -287,9 +350,9 @@ GRAPH
 #########################################################################################
 #########################################################################################
 
-#Tests of association:
+#2.1. Tests of association:
 
-#Is there an overall association between HT and AD?
+#2.1.1.  Is there an overall association between HT and AD?
 
 #Assessing the relationship between two categorical variables = Chi squared test
 
@@ -319,9 +382,9 @@ CROSSTABS
 
 #########################################################################################
 
-#Single comparison tests
+#2.2. Single comparison tests
 
-#Is there a significant difference between mean mid-life SBP and mean mid-life DBP in AD vs Controls?
+# 2.2.1. Is there a significant difference between mean mid-life SBP and mean mid-life DBP in AD vs Controls?
 
 DATASET ACTIVATE DataSetOriginal.
 # Originial, non-split
@@ -355,7 +418,7 @@ NPAR TESTS
 
 #Individuals with AD have sig. higher late-life DBP compared to controls (p<0.05). 
 
-#Is there a association between mean mid-life SBP and mean mid-life DBP in AD vs Controls?
+#2.1.3. Is there a association between mean mid-life SBP and mean mid-life DBP in AD vs Controls?
 
 #A binomial logistic regression, predicts the probability that an observation falls into one of 
 #two categories of a dichotomous dependent variable based on one or more independent variables that can be 
@@ -432,6 +495,8 @@ LOGISTIC REGRESSION VARIABLES AHT_anyreason_rec
   /PRINT=CORR CI(95)
   /CRITERIA=PIN(0.05) POUT(0.10) ITERATE(20) CUT(0.5).
 
+
+
 #########################################################################################
 
 #Is HT more likely to be treated in Control than AD?
@@ -481,7 +546,7 @@ LOGISTIC REGRESSION VARIABLES cohort_AD_control
 
 #########################################################################################
 
-#Relationship between different AHT and BP
+#3.3. Relationship between different AHT and BP
 
 DATASET ACTIVATE DataSetOriginal.
 # Originial, non-split
@@ -492,7 +557,7 @@ DATASET ACTIVATE DataSetOriginal.
 #Data normally distributed if Shapiro test not sig.
 #Assumption of homogeneity of variance: levenes test must be non-significant
 
-#Comparing mean BP between any AHM and no AHM
+#3.3.1. Comparing mean BP between any AHM and no AHM
 
 EXAMINE VARIABLES=SBP_midlife_mean SBP_65plus DBP_midlife_mean DBP_65plus
   /PLOT BOXPLOT STEMLEAF NPPLOT
@@ -557,9 +622,9 @@ NPAR TESTS
 
 #########################################################################################
 
-#Were AD cases more likely to have received less effective AHT?
+# 3.4. Were AD cases more likely to have received less effective AHT?
 
-#Were the AD group more likely to have donated their brain in an earlier time when HT was less likely to be treated appropriately? 
+# Were the AD group more likely to have donated their brain in an earlier time when HT was less likely to be treated appropriately? 
 
 DATASET ACTIVATE DataSetAD.
 #Split by AD only
@@ -580,7 +645,6 @@ NPAR TESTS
 
 #U = 3242, p = 0.000
 #Control group sig. later year if death than AD group
-
 
 
 #########################################################################################
@@ -620,12 +684,17 @@ T-TEST GROUPS=htn_rec(0 1)
 
 #for table (means and SEM)
 
-T-TEST GROUPS=htn_rec(0 1)
-  /MISSING=ANALYSIS
-/VARIABLES= AB42insol_fcx AB40insol_fcx ab_4G8_f AT8_F AB42insol_pccx AB40insol_pccx 
-ab_4G8_p AT8_P AB42insol_fwm AB42insol_pcwm
-  /CRITERIA=CI(.95). 
+DATASET ACTIVATE DataSetTableADHT.
 
+SORT CASES  BY cohort_AD_control htn_rec.
+SPLIT FILE LAYERED BY cohort_AD_control htn_rec.
+
+EXAMINE VARIABLES=AB42insol_fcx AB40insol_fcx AB40insol_pccx AB42insol_fwm AB42insol_pcwm 
+  /PLOT NONE
+  /STATISTICS DESCRIPTIVES
+  /CINTERVAL 95
+  /MISSING LISTWISE
+  /NOTOTAL.
 
 #########################################################################################
 
@@ -643,15 +712,22 @@ T-TEST GROUPS=htn_midlife_rec(0 1)
 
 #For table
 
-T-TEST GROUPS=htn_midlife_rec(0 1)
-  /MISSING=ANALYSIS
-/VARIABLES= AB42insol_fcx AB40insol_fcx ab_4G8_f AT8_F AB42insol_pccx AB40insol_pccx 
-ab_4G8_p AT8_P AB42insol_fwm AB42insol_pcwm
-  /CRITERIA=CI(.95). 
+DATASET ACTIVATE DataSetTableADMidHT.
 
+SORT CASES  BY cohort_AD_control htn_midlife_rec.
+SPLIT FILE LAYERED BY cohort_AD_control htn_midlife_rec.
+
+EXAMINE VARIABLES=AB42insol_fcx AB40insol_fcx AB40insol_pccx AB42insol_fwm AB42insol_pcwm 
+  /PLOT NONE
+  /STATISTICS DESCRIPTIVES
+  /CINTERVAL 95
+  /MISSING LISTWISE
+  /NOTOTAL.
 #########################################################################################
 
 #Two-way ANOVA
+
+DATASET ACTIVATE DataSetOriginal.
 
 #Examine normality of residuals
 
@@ -698,11 +774,14 @@ ab_4G8_p AT8_P AB42insol_fwm AB42insol_pcwm BY cohort_AD_control htn_rec
 #########################################################################################
 #########################################################################################
 
-#Hypertension ever in life compared to normotensive
+#5.1. Hypertension ever in life compared to normotensive
 
 # Comparing the means of two independent groups (HT vs Norm) = t test (using non-split data)
 # Assumptions: Normality and Homogeneity of variance: levenes test must be non-significant
 #Check for normal distribution
+
+DATASET ACTIVATE DataSetOriginal.
+DATASET ACTIVATE DataSetAD.
 
 EXAMINE VARIABLES=VEGF_fcx2 VEGF_fwm2 VEGF_pccx2 VEGF_pcwm2 FGA_Hb_fcx FGA_Hb_fwm FGA_Hb_pcx 
   FGA_Hb_pwm PDGFRB_pccx2 PDGFRB_fcx2
@@ -723,8 +802,6 @@ NPAR TESTS
   /STATISTICS=DESCRIPTIVES QUARTILES
   /MISSING ANALYSIS.
 
-#PDGFRB_pccx2 PDGFRB_fcx2 non-sig. i.e. normal distribution
-
 #Mid-life HT
 
 NPAR TESTS
@@ -735,6 +812,40 @@ NPAR TESTS
 
 #All non-sig.
 
+VEGF_fcx2 FGA_Hb_fcx PDGFRB_fcx2 VEGF_pccx2 FGA_Hb_pcx PDGFRB_pccx2 
+VEGF_fwm2 VEGF_pcwm2 FGA_Hb_fwm FGA_Hb_pwm 
+
+#For table
+
+DATASET ACTIVATE DataSetHT.
+DATASET ACTIVATE DataSetMidHT.
+
+SORT CASES  BY htn_rec.
+SPLIT FILE LAYERED BY htn_rec.
+
+SORT CASES  BY htn_midlife_rec.
+SPLIT FILE LAYERED BY htn_midlife_rec.
+
+EXAMINE VARIABLES= VEGF_fcx2 FGA_Hb_fcx PDGFRB_fcx2 VEGF_pccx2 FGA_Hb_pcx PDGFRB_pccx2 
+VEGF_fwm2 VEGF_pcwm2 FGA_Hb_fwm FGA_Hb_pwm 
+  /PLOT NONE
+  /STATISTICS DESCRIPTIVES
+  /CINTERVAL 95
+  /MISSING LISTWISE
+  /NOTOTAL.
+
+SORT CASES  BY cohort_AD_control htn_rec.
+SPLIT FILE LAYERED BY cohort_AD_control htn_rec.
+
+SORT CASES  BY cohort_AD_control htn_midlife_rec.
+SPLIT FILE LAYERED BY cohort_AD_control htn_midlife_rec.
+
+EXAMINE VARIABLES= PDGFRB_fcx2 PDGFRB_pccx2 
+  /PLOT NONE
+  /STATISTICS DESCRIPTIVES
+  /CINTERVAL 95
+  /MISSING LISTWISE
+  /NOTOTAL.
 
 #########################################################################################
 #########################################################################################
@@ -819,6 +930,7 @@ NPAR TESTS
   /STATISTICS=DESCRIPTIVES QUARTILES
   /MISSING ANALYSIS.
 
+
 #CAA
 
 T-TEST GROUPS=CAA_frontal_rec(0 1)
@@ -838,6 +950,7 @@ NPAR TESTS
   /M-W= SBP_65plus BY CAA_parietal_rec(0 1)
   /STATISTICS=DESCRIPTIVES QUARTILES
   /MISSING ANALYSIS.
+
 
 #Spearmans rank
 
@@ -862,31 +975,8 @@ NONPAR CORR
   /MISSING=PAIRWISE.
 
 
-#########################################################################################
-#########################################################################################
-
-#For retrospective power analysis
-
-#########################################################################################
-#########################################################################################
-
-DATASET ACTIVATE DataSetAD.
-
-NPAR TESTS
-  /M-W= ab_4G8_f BY htn_rec(0 1)
-  /STATISTICS=DESCRIPTIVES QUARTILES
-  /MISSING ANALYSIS.
-
-#for table 
-
-T-TEST GROUPS=htn_rec(0 1)
-  /MISSING=ANALYSIS
-/VARIABLES= ab_4G8_f 
-  /CRITERIA=CI(.95). 
-
-
 
 #Thank you for reading. 
-#Best,
+#Best wishes,
 #Amina
 
